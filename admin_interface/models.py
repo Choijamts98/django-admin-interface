@@ -10,25 +10,38 @@ from .cache import del_cached_active_theme
 
 
 class ThemeQuerySet(models.QuerySet):
-    def get_active(self):
-        objs_active_qs = self.filter(active=True)
-        objs_active_ls = list(objs_active_qs)
-        objs_active_count = len(objs_active_ls)
+    def get_active(self, _site=None):
+        if _site:
+            admin_site = AdminSite.objects.create(
+                name=str(_site).capitalize(),
+                cache_name=_site
+            )
+            objs_active_qs = self.filter(admin_site=admin_site, active=True)
 
-        if objs_active_count == 0:
+            if not objs_active_qs.exists():
+                objs_active_qs = self.filter(admin_site=None, active=True)
+
+            objs_active_ls = list(objs_active_qs)
+            objs_active_count = len(objs_active_ls)
+
+            if objs_active_count == 0:
+                obj = self.all().first()
+                if obj:
+                    obj.set_active(admin_site)
+                else:
+                    obj = self.create()
+
+            elif objs_active_count == 1:
+                obj = objs_active_ls[0]
+                obj.set_active(admin_site)
+
+            elif objs_active_count > 1:
+                obj = objs_active_ls[-1]
+                obj.set_active(admin_site)
+        else:
             obj = self.all().first()
-            if obj:
-                obj.set_active()
-            else:
+            if not obj:
                 obj = self.create()
-
-        elif objs_active_count == 1:
-            obj = objs_active_ls[0]
-
-        elif objs_active_count > 1:
-            obj = objs_active_ls[-1]
-            obj.set_active()
-
         return obj
 
 class AdminSite(models.Model):
@@ -53,6 +66,15 @@ class AdminSite(models.Model):
     def __str__(self):
         return self.name
     
+@receiver(pre_save, sender=AdminSite)
+def pre_save_site(sender, instance, **kwargs):
+    if instance.pk is None:
+        try:
+            obj = AdminSite.objects.get(cache_name=instance.cache_name)
+            instance.pk = obj.pk
+        except AdminSite.DoesNotExist:
+            pass
+
 class Theme(models.Model):
     admin_site = models.ForeignKey(
         "admin_interface.AdminSite",
@@ -405,8 +427,9 @@ class Theme(models.Model):
 
     objects = ThemeQuerySet.as_manager()
 
-    def set_active(self):
+    def set_active(self, _site=None):
         self.active = True
+        self.admin_site = _site
         self.save()
 
     class Meta:
@@ -420,15 +443,15 @@ class Theme(models.Model):
 
 @receiver(post_delete, sender=Theme)
 def post_delete_handler(sender, instance, **kwargs):
-    del_cached_active_theme()
+    del_cached_active_theme(getattr(instance.admin_site , "cache_name", None))
     Theme.objects.get_active()
 
 
 @receiver(post_save, sender=Theme)
 def post_save_handler(sender, instance, **kwargs):
-    del_cached_active_theme()
+    del_cached_active_theme(getattr(instance.admin_site , "cache_name", None))
     if instance.active:
-        Theme.objects.exclude(pk=instance.pk).update(active=False)
+        Theme.objects.filter(admin_site=instance.admin_site).exclude(pk=instance.pk).update(active=False)
     Theme.objects.get_active()
 
 

@@ -55,12 +55,18 @@ def get_admin_interface_languages(context):
     return langs_data
 
 
-@register.simple_tag()
-def get_admin_interface_theme():
-    theme = get_cached_active_theme()
+@register.simple_tag(takes_context=True)
+def get_admin_interface_theme(context=None):
+    _admin = "admin"
+    if context:
+        request = context.get('request', None)
+        if request:
+            _admin = str(request.path).split("/")[1]
+    
+    theme = get_cached_active_theme(_admin)
     if not theme:
-        theme = Theme.objects.get_active()
-        set_cached_active_theme(theme)
+        theme = Theme.objects.get_active(_site=_admin)
+        set_cached_active_theme(theme, _admin)
     return theme
 
 

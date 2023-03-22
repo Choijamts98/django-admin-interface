@@ -10,9 +10,19 @@ class AdminSiteAdmin(admin.ModelAdmin):
         "cache_name",
     )
 
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+    
 @admin.register(Theme)
 class ThemeAdmin(admin.ModelAdmin):
     list_display = (
+        "admin_site",
         "name",
         "active",
     )
@@ -26,6 +36,7 @@ class ThemeAdmin(admin.ModelAdmin):
             {
                 "classes": ("wide",),
                 "fields": (
+                    "admin_site",
                     "name",
                     "active",
                 ),
