@@ -1,8 +1,14 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from admin_interface.models import Theme
+from admin_interface.models import Theme, AdminSite
 
+@admin.register(AdminSite)
+class AdminSiteAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "cache_name",
+    )
 
 @admin.register(Theme)
 class ThemeAdmin(admin.ModelAdmin):
